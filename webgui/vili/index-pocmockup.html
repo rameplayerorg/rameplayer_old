@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=0.8">
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="mobile-web-app-capable" content="yes">
+	
+	<title>POCGUI</title>
+	
+	<link rel="shortcut icon" href="./images/small_icon.png">
+    <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Open+Sans:300,400,700">
+	<link rel="stylesheet" href="./css/jquery.mobile-1.4.5.css">
+	<style type="text/css"></style>
+	<style id="inset-tablist">
+		.tablist-left {
+			width: 10%;
+			display: inline-block;
+		}
+		.tablist-content {
+			width: 60%;
+			display: inline-block;
+			vertical-align: top;
+			margin-left: 5%;
+		}
+		
+		
+		.tab {
+			width: 16.6% !important;
+			clear: none !important;  /* Prevent line break */
+		}
+		.ui-rangeslider .ui-rangeslider-sliders-1b {
+			display : none !important;
+		}
+	</style>
+	
+	<script src="./scripts/jquery.js"></script>
+	<script src="./scripts/jquery.mobile-1.4.5.js"></script>
+	<script type="text/javascript">
+
+	"use strict";
+
+	var debug = false;
+	var xmlHttp = new XMLHttpRequest();
+	var jsonUrl = "localhost";
+
+	function loadXMLDoc(fileUrl, cfunc) {
+		if (window.XMLHttpRequest) { // IE7+, Firefox, Chrome, Opera, Safari
+			xmlHttp = new XMLHttpRequest();
+		} else { // IE6, IE5
+			xmlHttp = new ActiveXObject("Microsoft.XMLHTTP");
+		}
+		xmlHttp.onreadystatechange = cfunc;
+		xmlHttp.open("GET", fileUrl, true);
+		xmlHttp.send();
+	}
+
+	function loadJsonCallback() {
+		var debugInfo = "DEBUG: ";		
+		var response = "";		
+		if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+
+			response = xmlHttp.responseText;
+			//debugInfo = response;	document.getElementById("alert-response-output").innerHTML = debugInfo;
+
+			// TODO: support for older browsers? (use jQuery / json2.js?)
+			var responseData = JSON.parse(response);
+
+			debugInfo = debugInfo + " " + responseData.toc.length + " "
+					+ responseData.toc[0].format.filename;
+
+			parseTocJson(responseData);
+			layoutOrientation(window.orientation);
+
+			debugInfo = debugInfo + " window orientation is "
+					+ window.orientation;
+			if (debug) {
+				document.getElementById("debug-response-output").innerHTML = debugInfo;
+			}
+		}
+	}
+
+	// Always load TOC on page load:
+	loadXMLDoc(jsonUrl, loadJsonCallback);
+
+	// UI parsing setup					
+	var btnColumnsPortrait = 10;
+	var btnColumnsLandscape = 15;
+	var jQueryClassNamePostfixes = 'abcdefghijklmnopqrstuvwxyz';
+	var isPortrait = false;
+
+	function parseTocJson(data) {
+
+		var targetLandscape = document.getElementById("toc_landscape");
+		var targetPortrait = document.getElementById("toc_portrait");
+
+		for (var a = 0; a < data.toc.length; ++a) {
+			var dataDivP = document.createElement("div");
+			var dataDivL = document.createElement("div");
+			dataDivP.setAttribute("class", "ui-block-" + jQueryClassNamePostfixes.charAt(a % btnColumnsPortrait));
+			dataDivL.setAttribute("class", "ui-block-" + jQueryClassNamePostfixes.charAt(a % btnColumnsLandscape));
+			var d_track = data.toc[a].format.tags.track;
+
+			var inputBtn = document.createElement('input');
+			inputBtn.type = 'button';
+			inputBtn.setAttribute("data-theme", "a");
+			inputBtn.setAttribute("class", "ui-btn ui-btn-a ui-shadow ui-corner-all");
+
+			inputBtn.setAttribute("value", d_track);
+			var d_filename = data.toc[a].format.filename;
+			var d_title = data.toc[a].format.tags.title;
+			inputBtn.onclick = (function(f1, f2) {
+				return function() {
+					onClickPlayFile(f1, f2);
+				};
+			})(d_filename, d_title);
+
+			dataDivP.appendChild(inputBtn);
+			dataDivL.appendChild(inputBtn.cloneNode(true));
+
+			// Build two sets, landscape and portrait. Only show one depending on screen orientation.
+			targetLandscape.appendChild(dataDivL);
+			targetPortrait.appendChild(dataDivP);
+		}
+
+	}
+
+	function layoutOrientation(orientation) {
+
+		console.log("new orientation: " + orientation);
+
+		if ("portrait" == orientation) {
+			$("#music_orientation_portrait").show();
+			$("#music_orientation_landscape").hide();
+			isPortrait = true;
+		} else {
+			// Default is landscape, if orientation is undefined
+			$("#music_orientation_landscape").show();
+			$("#music_orientation_portrait").hide();
+			isPortrait = false;
+		}
+		
+		if ("landscape" == orientation) {
+			$( "#music_orientation_portrait" ).hide();
+			$( "#music_orientation_landscape" ).show();
+			$( "#audiobook_book_orientation_landscape" ).show();
+			$( "#audiobook_book_orientation_portrait" ).hide();
+			
+			$( "#audiobook_chapter_orientation_portrait" ).hide();
+			$( "#audiobook_chapter_orientation_landscape" ).show();
+			
+			$( "#audiobook_paragraph_orientation_portrait" ).hide();
+			$( "#audiobook_paragraph_orientation_landscape" ).show();
+			
+		} else {
+			$( "#music_orientation_portrait" ).show();
+			$( "#music_orientation_landscape" ).hide()
+			$( "#audiobook_book_orientation_landscape" ).hide();
+			$( "#audiobook_book_orientation_portrait" ).show();
+			
+			$( "#audiobook_chapter_orientation_portrait" ).show();
+			$( "#audiobook_chapter_orientation_landscape" ).hide();
+
+			$( "#audiobook_paragraph_orientation_portrait" ).show();
+			$( "#audiobook_paragraph_orientation_landscape" ).hide();
+		}	
+
+	}
+
+	$(window).on("orientationchange", function(event) {
+		layoutOrientation(event.orientation);
+	});
+
+	function onClickPlayFile(f1, f2) {
+		document.getElementById("now_playing_title").innerHTML = f2;
+		$("#player_blade").show();
+		// TODO:
+		//play_video(f1);			
+	}
+
+	layoutOrientation("portrait");
+
+</script>
+	
+</head>
+
+<body>
+
+	<div data-role="tabs" id="tabs">
+	
+		<div data-role="navbar" >
+			<ul>
+		    	<li class="tab"><a href="#content_music" data-ajax="false">MUSIC</a></li>
+		    	<li class="tab"><a href="#content_audiobook_main" data-ajax="false" id="tab_audiobook">AUDIOBOOK</a></li>
+		    	<li class="tab"><a href="#content_videos" data-ajax="false">VIDEOS</a></li>
+		 		<li class="tab"><a href="#content_othermedia" data-ajax="false">USB</a></li>
+		 		<li class="tab"><a href="#content_playlist" data-ajax="false" >PLAYLIST</a></li>
+		 		<li class="tab"><a href="#content_settings" data-ajax="false" class="ui-btn ui-icon-gear ui-btn-icon-right">&nbsp;</a></li>
+			</ul>
+		</div>
+
+		<div id="content_music" class="ui-body-d ui-content">
+			<div id="music_orientation_landscape">
+				<fieldset class="ui-grid-n" id="toc_landscape">
+					<!-- <div id="toc_landscape"></div> -->
+
+					<!-- <div class="ui-block-a"><button type="submit" data-theme="a" class=" ui-btn ui-btn-a ui-shadow ui-corner-all">1</button></div> 
+					 		<div class="ui-block-b"><button type="submit" data-theme="a" class=" ui-btn ui-btn-a ui-shadow ui-corner-all">2</button></div>
+							<div class="ui-block-c"><button type="submit" data-theme="a" class=" ui-btn ui-btn-a ui-shadow ui-corner-all">3</button></div>
+							<div class="ui-block-d"><button type="submit" data-theme="a" class=" ui-btn ui-btn-a ui-shadow ui-corner-all">4</button></div>
+					  	-->
+
+				</fieldset>
+			</div>
+
+			<div id="music_orientation_portrait" style="display: none;">
+				<fieldset class="ui-grid-i" id="toc_portrait">
+					<!-- <div id="toc_portrait"></div> -->
+					<!-- <div class="ui-block-a"><button type="submit" data-theme="a" class=" ui-btn ui-btn-a ui-shadow ui-corner-all">1</button></div>
+							<div class="ui-block-b"><button type="submit" data-theme="a" class=" ui-btn ui-btn-a ui-shadow ui-corner-all">2</button></div>
+							<div class="ui-block-c"><button type="submit" data-theme="a" class=" ui-btn ui-btn-a ui-shadow ui-corner-all">3</button></div>
+							<div class="ui-block-d"><button type="submit" data-theme="a" class=" ui-btn ui-btn-a ui-shadow ui-corner-all">4</button></div>
+						 -->
+
+				</fieldset>
+			</div>
+		</div>
+
+
+		<div id="content_audiobook_main" class="ui-body-d ui-content">
+			<div data-role="tabs" id="tabs_audiobook">
+				<div data-role="navbar">
+					<ul>
+						<li><a href="#content_audiobook" id="tab_book_name"
+							data-ajax="false"></a></li>
+						<li><a href="#content_audiobook_chapter"
+							id="tab_book_chapter" data-ajax="false"></a></li>
+						<li><a href="#content_audiobook_paragraph"
+							id="tab_book_paragraph" data-ajax="false"></a></li>
+					</ul>
+				</div>
+
+				<div id="content_audiobook_chapter" class="ui-body-d ui-content">
+					<div id="audiobook_chapter_orientation_landscape">
+						<fieldset class="ui-grid-n">
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a"
+									id="content_audiobook_chapter_orientation_landscape_1">1</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a"
+									id="content_audiobook_chapter_orientation_landscape_2">2</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">3</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">4</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">5</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">6</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">7</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">8</button>
+							</div>
+							<div class="ui-block-i">
+								<button type="submit" data-theme="a">9</button>
+							</div>
+							<div class="ui-block-j">
+								<button type="submit" data-theme="a">10</button>
+							</div>
+							<div class="ui-block-k">
+								<button type="submit" data-theme="a">11</button>
+							</div>
+							<div class="ui-block-l">
+								<button type="submit" data-theme="a">12</button>
+							</div>
+							<div class="ui-block-m">
+								<button type="submit" data-theme="a">13</button>
+							</div>
+							<div class="ui-block-n">
+								<button type="submit" data-theme="a">14</button>
+							</div>
+							<div class="ui-block-o">
+								<button type="submit" data-theme="a">15</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">16</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">17</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">18</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">19</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">20</button>
+							</div>
+						</fieldset>
+					</div>
+					<div id="audiobook_chapter_orientation_portrait">
+						<fieldset class="ui-grid-i">
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a"
+									id="content_audiobook_chapter_orientation_portrait_1">1</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a"
+									id="content_audiobook_chapter_orientation_portrait_2">2</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">3</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">4</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">5</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">6</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">7</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">8</button>
+							</div>
+							<div class="ui-block-i">
+								<button type="submit" data-theme="a">9</button>
+							</div>
+							<div class="ui-block-j">
+								<button type="submit" data-theme="a">10</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">11</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">12</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">13</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">14</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">15</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">16</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">17</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">18</button>
+							</div>
+							<div class="ui-block-i">
+								<button type="submit" data-theme="a">19</button>
+							</div>
+							<div class="ui-block-j">
+								<button type="submit" data-theme="a">20</button>
+							</div>
+						</fieldset>
+					</div>
+				</div>
+				
+				<div id="content_audiobook_paragraph" class="ui-body-d ui-content">
+					<div id="audiobook_paragraph_orientation_landscape">
+						<fieldset class="ui-grid-n">
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a"
+									id="content_audiobook_paragraph_orientation_landscape_1">1</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a"
+									id="content_audiobook_paragraph_orientation_landscape_2">2</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">3</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">4</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">5</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">6</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">7</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">8</button>
+							</div>
+							<div class="ui-block-i">
+								<button type="submit" data-theme="a">9</button>
+							</div>
+							<div class="ui-block-j">
+								<button type="submit" data-theme="a">10</button>
+							</div>
+							<div class="ui-block-k">
+								<button type="submit" data-theme="a">11</button>
+							</div>
+							<div class="ui-block-l">
+								<button type="submit" data-theme="a">12</button>
+							</div>
+							<div class="ui-block-m">
+								<button type="submit" data-theme="a">13</button>
+							</div>
+							<div class="ui-block-n">
+								<button type="submit" data-theme="a">14</button>
+							</div>
+							<div class="ui-block-o">
+								<button type="submit" data-theme="a">15</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">16</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">17</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">18</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">19</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">20</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">21</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">22</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">23</button>
+							</div>
+							<div class="ui-block-i">
+								<button type="submit" data-theme="a">24</button>
+							</div>
+							<div class="ui-block-j">
+								<button type="submit" data-theme="a">25</button>
+							</div>
+							<div class="ui-block-k">
+								<button type="submit" data-theme="a">26</button>
+							</div>
+							<div class="ui-block-l">
+								<button type="submit" data-theme="a">27</button>
+							</div>
+							<div class="ui-block-m">
+								<button type="submit" data-theme="a">28</button>
+							</div>
+							<div class="ui-block-n">
+								<button type="submit" data-theme="a">29</button>
+							</div>
+							<div class="ui-block-o">
+								<button type="submit" data-theme="a">30</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">31</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">32</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">33</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">34</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">35</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">36</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">37</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">38</button>
+							</div>
+							<div class="ui-block-i">
+								<button type="submit" data-theme="a">39</button>
+							</div>
+							<div class="ui-block-j">
+								<button type="submit" data-theme="a">40</button>
+							</div>
+						</fieldset>
+					</div>
+					<div id="audiobook_paragraph_orientation_portrait">
+						<fieldset class="ui-grid-i">
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a"
+									id="content_audiobook_paragraph_orientation_portrait_1">1</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a"
+									id="content_audiobook_paragraph_orientation_portrait_2">2</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">3</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">4</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">5</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">6</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">7</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">8</button>
+							</div>
+							<div class="ui-block-i">
+								<button type="submit" data-theme="a">9</button>
+							</div>
+							<div class="ui-block-j">
+								<button type="submit" data-theme="a">10</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">11</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">12</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">13</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">14</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">15</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">16</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">17</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">18</button>
+							</div>
+							<div class="ui-block-i">
+								<button type="submit" data-theme="a">19</button>
+							</div>
+							<div class="ui-block-j">
+								<button type="submit" data-theme="a">20</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">21</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">22</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">23</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">24</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">25</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">26</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">27</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">28</button>
+							</div>
+							<div class="ui-block-i">
+								<button type="submit" data-theme="a">29</button>
+							</div>
+							<div class="ui-block-j">
+								<button type="submit" data-theme="a">30</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">31</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">32</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">33</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">34</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">35</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">36</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">37</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">38</button>
+							</div>
+							<div class="ui-block-i">
+								<button type="submit" data-theme="a">39</button>
+							</div>
+							<div class="ui-block-j">
+								<button type="submit" data-theme="a">40</button>
+							</div>
+						</fieldset>
+					</div>
+				</div>
+
+				<div id="content_audiobook" class="ui-body-d ui-content">
+					<div id="audiobook_book_orientation_landscape">
+						<fieldset class="ui-grid-g">
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a" id="example_a">ExampleA</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a" id="example_a1">ExampleA1</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">ExampleA2</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">ExampleA3</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">ExampleA4</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">ExampleA5</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">ExampleA6</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">ExampleA7</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">ExampleA8</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">ExampleA9</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">ExampleB</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">ExampleB1</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">ExampleB2</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">ExampleB3</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">ExampleB4</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">ExampleB5</button>
+							</div>
+							<div class="ui-block-g">
+								<button type="submit" data-theme="a">ExampleB6</button>
+							</div>
+							<div class="ui-block-h">
+								<button type="submit" data-theme="a">ExampleB7</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">ExampleB8</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">ExampleB9</button>
+							</div>
+						</fieldset>
+					</div>
+
+					<div id="audiobook_book_orientation_portrait">
+						<fieldset class="ui-grid-e">
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a" id="example_a">ExampleA</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a" id="example_a1">ExampleA1</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">ExampleA2</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">ExampleA3</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">ExampleA4</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">ExampleA5</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">ExampleA6</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">ExampleA7</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">ExampleA8</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">ExampleA9</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">ExampleB</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">ExampleB1</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">ExampleB2</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">ExampleB3</button>
+							</div>
+							<div class="ui-block-e">
+								<button type="submit" data-theme="a">ExampleB4</button>
+							</div>
+							<div class="ui-block-f">
+								<button type="submit" data-theme="a">ExampleB5</button>
+							</div>
+
+							<div class="ui-block-a">
+								<button type="submit" data-theme="a">ExampleB6</button>
+							</div>
+							<div class="ui-block-b">
+								<button type="submit" data-theme="a">ExampleB7</button>
+							</div>
+							<div class="ui-block-c">
+								<button type="submit" data-theme="a">ExampleB8</button>
+							</div>
+							<div class="ui-block-d">
+								<button type="submit" data-theme="a">ExampleB9</button>
+							</div>
+						</fieldset>
+					</div>
+				</div>
+			</div>
+		</div>
+		
+		
+
+		<div id="content_videos" class="ui-body-d ui-content">	
+			<form>
+				<div class="ui-field-contain">
+				    <label for="select-native-1">Video Type:</label>
+				    <select name="select-native-1" id="select-native-1">
+				        <option value="1">Movie</option>
+				        <option value="2">Video</option>
+				        <option value="3">Lecture</option>
+				        <option value="4">Live Streaming</option>
+				    </select>
+				</div>
+					
+				<table data-role="table" id="movie-table-custom" data-mode="reflow" class="movie-list ui-responsive">
+					<thead>
+						<tr>
+							<th data-priority="2">Date</th>
+							<th>Title</th>
+							<th data-priority="3">Length</th>
+						</tr>
+					</thead>
+			     <tbody>
+			       <tr>
+			         <th>1.6.2014</th>
+			         <td><a href="" data-rel="external">Video title 1</a></td>
+			         <td>1h 20min</td>
+			       </tr>
+			       <tr>
+			         <th>2.6.2014</th>
+			         <td><a href="" data-rel="external">Video title 2</a></td>
+			         <td>57min</td>
+			       </tr>
+			       <tr>
+			         <th>3.6.2014</th>
+			         <td><a href="" data-rel="external">Video title 3</a></td>
+			         <td>1h 50min</td>
+			       </tr>
+			       <tr>
+			         <th>4.6.2014</th>
+			         <td><a href="" data-rel="external">Video title 4</a></td>
+			         <td>1h 30min</td>
+			       </tr>
+			       <tr>
+			         <th>5.6.2014</th>
+			         <td><a href="" data-rel="external">Some other video</a></td>
+			         <td>2h 20min</td>
+			       </tr>
+			       <tr>
+			         <th>6.6.2014</th>
+			         <td><a href="" data-rel="external">More videos</a></td>
+			         <td>1h 30min</td>
+			       </tr>
+			       <tr>
+			         <th>7.6.2014</th>
+			         <td><a href="" data-rel="external">Movie</a></td>
+			         <td>3h 30min</td>
+			       </tr>
+			       <tr>
+			         <th>3.6.2014</th>
+			         <td><a href="" data-rel="external">Movie title 3</a></td>
+			         <td>1h 50min</td>
+			       </tr>
+			       <tr>
+			         <th>4.6.2014</th>
+			         <td><a href="" data-rel="external">Movie title 4</a></td>
+			         <td>1h 30min</td>
+			       </tr>
+			       <tr>
+			         <th>5.6.2014</th>
+			         <td><a href="" data-rel="external">Some other movie</a></td>
+			         <td>2h 20min</td>
+			       </tr>
+			       <tr>
+			         <th>6.6.2014</th>
+			         <td><a href="" data-rel="external">More movies</a></td>
+			         <td>1h 30min</td>
+			       </tr>
+			       <tr>
+			         <th>7.6.2014</th>
+			         <td><a href="" data-rel="external">Last movie</a></td>
+			         <td>3h 30min</td>
+			       </tr>
+			       <tr>
+			         <th>3.6.2014</th>
+			         <td><a href="" data-rel="external">Theatrical title 3</a></td>
+			         <td>1h 50min</td>
+			       </tr>
+			       <tr>
+			         <th>4.6.2014</th>
+			         <td><a href="" data-rel="external">Theatrical title 4</a></td>
+			         <td>1h 30min</td>
+			       </tr>
+			       <tr>
+			         <th>5.6.2014</th>
+			         <td><a href="" data-rel="external">Some other theatrical</a></td>
+			         <td>2h 20min</td>
+			       </tr>
+			       <tr>
+			         <th>6.6.2014</th>
+			         <td><a href="" data-rel="external">More theatricals</a></td>
+			         <td>1h 30min</td>
+			       </tr>
+			       <tr>
+			         <th>7.6.2014</th>
+			         <td><a href="" data-rel="external">Last theatrical</a></td>
+			         <td>3h 30min</td>
+			       </tr>
+			     </tbody>
+			   </table>
+			</form>
+		</div>  
+
+    	<div id="content_othermedia" class="ui-body-d ui-content">
+    		<form>
+				<div class="ui-field-contain">
+				    <label for="select-native-1">Other media type:</label>
+				    <select name="select-native-1" id="select-native-1">
+				        <option value="1">Video</option>
+				        <option value="2">Audio</option>
+				        <option value="3">Image</option>
+				    </select>
+				</div>
+	
+				<table data-role="table" id="movie-table-custom" data-mode="reflow" class="movie-list ui-responsive">
+				     <thead>
+				       <tr>
+				         <th data-priority="2">Date</th>
+				         <th>Title</th>
+				         <th data-priority="3">Length</th>
+				       </tr>
+				     </thead>
+				     <tbody>
+				       <tr>
+				         <th>1.6.2014</th>
+				         <td><a href="" data-rel="external">Other media title 1</a></td>
+				         <td>1h 20min</td>
+				       </tr>
+				       <tr>
+				         <th>2.6.2014</th>
+				         <td><a href="" data-rel="external">Other media title 2</a></td>
+				         <td>57min</td>
+				       </tr>
+				       <tr>
+				         <th>3.6.2014</th>
+				         <td><a href="" data-rel="external">Other media title 3</a></td>
+				         <td>1h 50min</td>
+				       </tr>
+				       <tr>
+				         <th>4.6.2014</th>
+				         <td><a href="" data-rel="external">Other media title 4</a></td>
+				         <td>1h 30min</td>
+				       </tr>
+				       <tr>
+				         <th>5.6.2014</th>
+				         <td><a href="" data-rel="external">Other media title 42</a></td>
+				         <td>2h 20min</td>
+				       </tr>
+				       <tr>
+				         <th>6.6.2014</th>
+				         <td><a href="" data-rel="external">Other media title 5</a></td>
+				         <td>1h 30min</td>
+				       </tr>
+				       <tr>
+				         <th>7.6.2014</th>
+				         <td><a href="" data-rel="external">Other media title 6</a></td>
+				         <td>3h 30min</td>
+				       </tr>
+				     </tbody>
+				   </table>
+			</form>
+		</div>
+		
+		
+    	<div id="content_playlist" class="ui-body-d ui-content">
+    		<form>
+      			<h1>Playlist</h1>
+				<table data-role="table" id="movie-table-custom" data-mode="reflow" class="movie-list ui-responsive">
+				     <thead>
+				       <tr>
+				         <th data-priority="2">Date</th>
+				         <th>Title</th>
+				         <th data-priority="3">Length</th>
+				       </tr>
+				     </thead>
+				     <tbody>
+				       <tr>
+				         <th></th>
+				         <td><a href="" data-rel="external">Symphony 101</a></td>
+				         <td>3min</td>
+				       </tr>
+				       <tr>
+				         <th>2.6.2014</th>
+				         <td><a href="" data-rel="external">Audiobook Reading</a></td>
+				         <td>37min</td>
+				       </tr>
+				       <tr>
+				         <th>3.6.2014</th>
+				         <td><a href="" data-rel="external">School Lecture</a></td>
+				         <td>30min</td>
+				       </tr>
+				       <tr>
+				         <th></th>
+				         <td><a href="" data-rel="external">Theme Song</a></td>
+				         <td>4min</td>
+				       </tr>
+				     </tbody>
+	   			</table>
+			</form>
+		</div>
+	
+		<div id="content_settings" class="ui-body-d ui-content">
+	      <h1>Settings</h1>
+		</div> 
+	
+	</div><!-- tabs -->
+		
+
+	<div data-role="footer" data-id="foo1" data-fullscreen="true" data-position="fixed">
+
+	    <div data-role="rangeslider">
+	        <input name="range-1a" id="range-1a" min="0" max="100" value="0" type="range">
+	        <input name="range-1b" id="range-1b" min="0" max="100" value="20" type="range">
+	    </div>
+
+		<div data-role="tabs" id="tabs">
+			<div data-role="navbar">
+				<ul>
+					<li><a href="a.html">PLAY</a></li>
+					<li><a href="b.html">STOP</a></li>
+					<li><a href="c.html">ADD to PLAYLIST</a></li>
+				</ul>
+			</div><!-- /navbar -->
+		</div>
+		<br>
+	</div><!-- /footer -->
+
+<script>
+
+$( window ).orientationchange();
+
+$( "#example_a" ).on( "click", function(event, ui) {
+	$( "#tab_book_name" ).text("Example A");
+	$('#tab_book_chapter').trigger('click');
+});
+$( "#example_a1" ).on( "click", function(event, ui) {
+	$( "#tab_book_name" ).text("Example A1");
+	$('#tab_book_chapter').trigger('click');
+});
+
+
+$( "#content_audiobook_chapter_orientation_landscape_1" ).on( "click", function(event, ui) {
+	$( "#tab_book_chapter" ).text("1");
+	$('#tab_book_paragraph').trigger('click');
+});
+$( "#content_audiobook_chapter_orientation_landscape_2" ).on( "click", function(event, ui) {
+	$( "#tab_book_chapter" ).text("2");
+	$('#tab_book_paragraph').trigger('click');
+});
+
+$( "#content_audiobook_paragraph_orientation_landscape_1" ).on( "click", function(event, ui) {
+	$( "#tab_book_paragraph" ).text("1");
+});
+$( "#content_audiobook_paragraph_orientation_landscape_2" ).on( "click", function(event, ui) {
+	$( "#tab_book_paragraph" ).text("2");
+});
+
+
+$( "#content_audiobook_chapter_orientation_portrait_1" ).on( "click", function(event, ui) {
+	$( "#tab_book_chapter" ).text("1");
+	$('#tab_book_paragraph').trigger('click');
+});
+$( "#content_audiobook_chapter_orientation_portrait_2" ).on( "click", function(event, ui) {
+	$( "#tab_book_chapter" ).text("2");
+	$('#tab_book_paragraph').trigger('click');
+});
+
+$( "#content_audiobook_paragraph_orientation_portrait_1" ).on( "click", function(event, ui) {
+	$( "#tab_book_paragraph" ).text("1");
+});
+$( "#content_audiobook_paragraph_orientation_portrait_2" ).on( "click", function(event, ui) {
+	$( "#tab_book_paragraph" ).text("2");
+});
+
+$( "#tab_audiobook" ).on( "click", function(event, ui) {	
+	$( "#tab_book_name" ).text("Book");
+	$( "#tab_book_chapter" ).text("Chapter");
+	$( "#tab_book_paragraph" ).text("Paragraph");
+	$('#tab_book_name').trigger('click');
+});
+
+//element.requestFullscreen();
+
+</script>
+
+</body>
+</html>
